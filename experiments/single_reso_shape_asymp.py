@@ -215,16 +215,8 @@ def _shape_inset(ax, box):
         s.set_edgecolor("0.6")
 
 
-def _save(fig, stem):
-    fig.tight_layout()
-    path = os.path.join(OUTDIR, f"{stem}.png")
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {path}")
-
-
 def plot_dispersion(results):
-    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    fig, ax = plt.subplots(figsize=(5.6, 4.4))
     ylo, yhi = np.inf, -np.inf
     for d in results:
         ok = d["disp_ok"] & np.isfinite(d["om_disp"].real) & (d["om_disp"].real > 0)
@@ -238,7 +230,11 @@ def plot_dispersion(results):
     _shape_legend(ax, "lower left",
                   r"$\omega_*(1-\frac{1}{2}\int_D|\phi_j|^4\mathrm{d}x\,\mathcal{N})$")
     _shape_inset(ax, [0.66, 0.62, 0.30, 0.32])
-    _save(fig, "asymptotics_dispersion")
+    fig.tight_layout()
+    path = os.path.join(OUTDIR, "asymptotics_dispersion.png")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {path}")
 
 
 def plot_re_vs_contrast(results):
@@ -246,7 +242,7 @@ def plot_re_vs_contrast(results):
     taus = results[0]["taus"]
     eps = 1.0 / np.sqrt(taus)
     el = np.linspace(0, eps.max() * 1.03, 100)
-    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    fig, ax = plt.subplots(figsize=(5.6, 4.4))
     lv = []
     for d in results:
         wj = 1.0 / np.sqrt(d["lam0"])
@@ -261,14 +257,19 @@ def plot_re_vs_contrast(results):
     ax.grid(alpha=0.3)
     _shape_legend(ax, "center left", r"slope $\hat{\omega}_j=1/\sqrt{\lambda_j}$")
     _shape_inset(ax, [0.63, 0.40, 0.33, 0.30])
-    _save(fig, "asymptotics_re_vs_contrast")
+    fig.tight_layout()
+    path = os.path.join(OUTDIR, "asymptotics_re_vs_contrast.png")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {path}")
+
 
 
 def plot_im_vs_contrast(results):
     taus = results[0]["taus"]
     eps = 1.0 / np.sqrt(taus)
     el = np.linspace(0, eps.max() * 1.03, 100)
-    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    fig, ax = plt.subplots(figsize=(5.6, 4.4))
     for d in results:
         slope = d["M"]**2 / (8 * np.pi * d["lam0"]**2)   # = o_j^4 int(phi0)^2 / 8pi
         ax.plot(eps, np.abs(d["om_tau"].imag) * np.sqrt(taus), MARKER[d["name"]],
@@ -281,7 +282,11 @@ def plot_im_vs_contrast(results):
     _shape_legend(ax, "upper left",
                   r"slope $\hat{\omega}_j^{4}(\int_D\phi_j\,\mathrm{d}x)^2/8\pi$")
     _shape_inset(ax, [0.64, 0.12, 0.32, 0.32])
-    _save(fig, "asymptotics_im_vs_contrast")
+    fig.tight_layout()
+    path = os.path.join(OUTDIR, "asymptotics_im_vs_contrast.png")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {path}")
 
 
 def plot_mode_gallery(results):
@@ -310,7 +315,7 @@ def main():
     plot_dispersion(results)
     plot_re_vs_contrast(results)
     plot_im_vs_contrast(results)
-    plot_mode_gallery(results)
+    # plot_mode_gallery(results)
 
 
 if __name__ == "__main__":
