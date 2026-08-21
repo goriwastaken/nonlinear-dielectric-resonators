@@ -1,7 +1,7 @@
 # ndr - nonlinear dielectric resonator package
 
 from .quadrature import volume_quadrature_sphere, volume_quadrature_peanut, volume_quadrature_ellipsoid, precompute_kernel, KernelPrecomp
-from .kernel import K_self, K_cross, dK_self, dK_cross
+from .kernel import K_self, K_cross, dK_self, dK_cross, evaluate_volume_potential
 from .state import pack_state, unpack_state, normalize_power, enforce_gauge, enforce_component_gauge
 from .residuals import (
     residual_reduced, jacobian_reduced,

@@ -1,12 +1,3 @@
-# volume integral operators for the dimer, see Ammari-Li reference
-# G(r) = exp(i omega r) / (4 pi r)
-
-# K_self:  within one sphere (diagonal corrected for self-cell singularity)
-# K_cross: between the two spheres separated by L along x
-# dK_*:    omega-derivatives (for the Jacobian)
-#
-# If numba is installed, the inner loops are JIT-compiled.
-
 import numpy as np
 from .quadrature import KernelPrecomp
 
@@ -170,6 +161,9 @@ def _self_integral_domega(omega, a):
     e = np.exp(1j *omega *a)
     return a**2*e/omega + 2j*a*e/omega**2 - 2*np.expm1(1j*omega*a)/omega**3
 
+# mirror_d2 is flag to determine if we use the mirror-symmetric geometry (which should be the case generally) or just dimers with translation
+def _mirror_check(pre):
+    return pre.Sx if pre.mirror_d2 else pre.Dx
 
 #public kernel functions
 
@@ -203,8 +197,8 @@ def dK_self(omega, pre):
 def K_cross(omega, L, pre):
     """Cross-sphere kernel (sphere 1 sources, sphere 2 observation, separated by L along x)"""
     if _HAS_NUMBA:
-        return _k_cross_nb(omega.real, omega.imag, L, pre.Dx, pre.Dy, pre.Dz, pre.W)
-    dx = pre.Dx - L
+        return _k_cross_nb(omega.real, omega.imag, L, _mirror_check(pre), pre.Dy, pre.Dz, pre.W)
+    dx = _mirror_check(pre) - L
     R = np.sqrt(dx**2 + pre.Dy**2 + pre.Dz**2)
     return np.exp(1j*omega*R) / (4*np.pi*R) * pre.W[None, :]
 
@@ -212,8 +206,8 @@ def K_cross(omega, L, pre):
 def dK_cross(omega, L, pre):
     """omega-derivative of K_cross"""
     if _HAS_NUMBA:
-        return _dk_cross_nb(omega.real, omega.imag, L, pre.Dx, pre.Dy, pre.Dz, pre.W)
-    dx = pre.Dx - L
+        return _dk_cross_nb(omega.real, omega.imag, L, _mirror_check(pre), pre.Dy, pre.Dz, pre.W)
+    dx = _mirror_check(pre) - L
     R = np.sqrt(dx**2 + pre.Dy**2 + pre.Dz**2)
     return 1j * np.exp(1j*omega*R) / (4*np.pi) * pre.W[None, :]
 
@@ -224,9 +218,9 @@ def build_full_K(omega, L, pre):
     n0 = len(pre.W)
     K11 = K_self(omega, pre)
     if _HAS_NUMBA:
-        G = _k_cross_base_nb(omega.real, omega.imag, L, pre.Dx, pre.Dy, pre.Dz)
+        G = _k_cross_base_nb(omega.real, omega.imag, L, _mirror_check(pre), pre.Dy, pre.Dz)
     else:
-        dx = pre.Dx - L
+        dx = _mirror_check(pre) - L
         R = np.sqrt(dx**2 + pre.Dy**2 + pre.Dz**2)
         G = np.exp(1j * omega * R) / (4 * np.pi * R)
     W = pre.W[None, :]
@@ -244,11 +238,11 @@ def build_full_K_and_dK(omega, L, pre):
     n0 = len(pre.W)
     if _HAS_NUMBA:
         K11, dK11 = _k_and_dk_self_nb(omega.real, omega.imag, pre.Rself, pre.W, pre.a)
-        G, dG = _k_and_dk_cross_base_nb(omega.real, omega.imag, L, pre.Dx, pre.Dy, pre.Dz)
+        G, dG = _k_and_dk_cross_base_nb(omega.real, omega.imag, L, _mirror_check(pre), pre.Dy, pre.Dz)
     else:
         K11 = K_self(omega, pre)
         dK11 = dK_self(omega, pre)
-        dx = pre.Dx - L
+        dx = _mirror_check(pre) - L
         R = np.sqrt(dx**2 + pre.Dy**2 + pre.Dz**2)
         eikr = np.exp(1j * omega * R)
         G = eikr / (4 * np.pi * R)
@@ -265,3 +259,22 @@ def build_full_K_and_dK(omega, L, pre):
     dK[n0:, :n0] = dG.T * W
     dK[n0:, n0:] = dK11
     return K, dK
+
+def evaluate_volume_potential(omega, pre, density, x_eval):
+    """
+    Evaluate the volume potential:
+        u(x) = sum_j G^omega(x - X0_j) * density_j * W_j
+    at exterior points x_eval for dimension 3.
+
+    Return u_ext : (M,) complex
+    """
+    if x_eval.shape[0] != pre.dim:
+        raise ValueError(f"x_eval shape {x_eval.shape} incompatible with pre.dim={pre.dim}")
+    dx = x_eval[0, :, None] - pre.X0[0, None, :]
+    dy = x_eval[1, :, None] - pre.X0[1, None, :]
+    dz = x_eval[2, :, None] - pre.X0[2, None, :]
+    R = np.sqrt(dx**2 + dy**2 + dz**2)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        G = np.where(R > 0, np.exp(1j * omega * R) / (4 * np.pi * R), 0j)
+    # weighted contraction:  u_ext[i] = sum_j G[i, j] * W[j] * density[j]
+    return G @ (pre.W * density)
