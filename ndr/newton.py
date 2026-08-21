@@ -17,8 +17,16 @@ class NewtonResult:
     residual_norm: float
     n_iter: int
 
+def better_norm(v):
+    amax = np.max(np.abs(v))
+    if amax == 0.0:
+        return 0.0
+    if not np.isfinite(amax):
+        return float('inf')
+    a = v*(1.0/amax)
+    return float(amax * np.sqrt(np.dot(a,a)))
 
-def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=False, FJ=None, **_kw):
+def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=False, FJ=None, feasible= (lambda x: x[-1] <= 0.0)):
     """Standard Newton with optional Armijo backtracking.
     If FJ(x) -> (residual, jacobian) is provided, uses it to avoid
     redundant kernel builds (F and J share the same K assembly)"""
@@ -30,7 +38,8 @@ def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=Fals
     else:
         f = F(x)
         jac_ready = None
-    rn = nla.norm(f)
+    # rn = nla.norm(f)
+    rn = better_norm(f)
 
     if verbose:
         print(f"  Newton 0: |F| = {rn:.4e}")
@@ -46,7 +55,8 @@ def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=Fals
             jac_ready = None
         elif FJ is not None:
             f, jac = FJ(x)
-            rn = nla.norm(f)
+            # rn = nla.norm(f)
+            rn = better_norm(f)
             if rn < tol:
                 return NewtonResult(x, True, rn, k - 1)
         else:
@@ -65,8 +75,12 @@ def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=Fals
 
         # line search uses F only, no Jacobian needed
         xt = x + dx
-        ft = F(xt)
-        nt = nla.norm(ft)
+        if feasible(xt):
+            ft = F(xt)
+            # nt = nla.norm(ft)
+            nt = better_norm(ft)
+        else:
+            ft, nt = None, float('inf')
         accepted = True
 
         if linesearch and (not np.isfinite(nt) or nt > rn):
@@ -75,8 +89,11 @@ def newton_solve(F, J, x0, tol=1e-10, max_iter=20, linesearch=True, verbose=Fals
             for _ in range(10):
                 alpha *= 0.5
                 xt = x + alpha * dx
+                if not feasible(xt): #skip infeasible (Im omega > 0 which is not physical anyway)
+                    continue
                 ft = F(xt)
-                nt = nla.norm(ft)
+                # nt = nla.norm(ft)
+                nt = better_norm(ft)
                 if np.isfinite(nt) and nt < best_n:
                     best_n, best_x, best_f = nt, xt.copy(), ft.copy()
                 if np.isfinite(nt) and nt < rn:
@@ -138,9 +155,7 @@ class DeflationOperator:
 def deflated_newton_solve(F, J, x0, known_roots, deflate_p=2, deflate_alpha=1.0,
                           tol=1e-11, max_iter=28, linesearch=True, verbose=False, **_kw):
     """
-    Deflated Newton
-    After deflated convergence do plain Newton but checks it
-    didnt snap back to known root
+    Deflated Newton method
     """
     if not known_roots:
         return newton_solve(F, J, x0, tol=tol, max_iter=max_iter,
@@ -219,7 +234,6 @@ def deflated_newton_solve(F, J, x0, known_roots, deflate_p=2, deflate_alpha=1.0,
             print(f"  Defl {k}: |F|={rn:.4e}  |MF|={dr:.4e}")
 
         if dr < tol:
-            # polish with plain Newton, but guard against snapping back
             pol = newton_solve(F, J, x, tol=tol, max_iter=10, linesearch=True)
             if pol.converged:
                 snapped = False
