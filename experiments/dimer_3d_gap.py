@@ -203,7 +203,7 @@ def run_branch_tracking(g, n_max=None, quad=None):
 
 def plot_bifurcation(g, even, odd, asym_p, asym_m, n_onset, n_pred, ortho):
     """Bifurcation diagram, ortho="A" (asymmetry fct vs N) or "omega" (Re(omega) vs N)"""
-    fig, ax = plt.subplots(figsize=(5.6, 4.4))
+    fig, ax = plt.subplots(figsize=(6, 4))
     n_c = n_onset if n_onset is not None else n_pred
 
     if ortho == "A":
@@ -270,7 +270,7 @@ def plot_splitting_and_ncrit(gap_list, quad=None):
         split.append(float((th.lambda_even - th.lambda_odd).real))
         ncrit.append(float(th.Ncrit_beta1))
 
-    fig, ax = plt.subplots(1, 2, figsize=(11.2, 4.4))
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
     ax[0].loglog(gR, split, "o-", color="C0")
     ax[0].set(xlabel=r"gap $g/R$", ylabel=r"$\lambda_+ - \lambda_-$")
     ax[1].loglog(gR, ncrit, "s-", color="C3")
